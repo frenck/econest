@@ -42,7 +42,10 @@ Setting up a custom repository is done by:
 
 9. add automatically discovered devices or manually add devices.
 
+Automatic:
 ![integration08.png](images/integration08.png)
+
+manually add:
 ![integration09.png](images/integration09.png)
 ![integration10.png](images/integration10.png)
 

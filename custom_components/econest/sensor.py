@@ -11,6 +11,7 @@ from homeassistant.const import UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from . import EconestConfigEntry
 from .const import DOMAIN
@@ -116,15 +117,18 @@ class WebSocketSensorManager:
                 else:
                     for ind, sub_data in enumerate(device_data):
                         for ch_ind, ch_data in enumerate(sub_data["chDatas"]):
-                            sub_ch_name = "ecoSub_" + str(ind) + "-channel_" + str(ch_ind + 1)
-                            self.add_sensor(ch_data, sub_ch_name)
+                            sub_ch_name = "ecoSensor_" + str(ch_ind + 1)
+                            self.add_sensor(ch_data, f"ecoSub-{ind}", sub_ch_name)
 
-    def add_sensor(self, data, device_type):
+    def add_sensor(self, data, identifiers, device_type=None):
         """Create sensors"""
         for key, value in data.items():
-            sensor_name = f"{device_type}-{key}"
+            if device_type:
+                sensor_name = f"{device_type}-{key}"
+            else:
+                sensor_name = f"{key}"
             if sensor_name not in self.sensors:
-                new_sensor = EconestSensor(self.econest_energy, sensor_name)
+                new_sensor = EconestSensor(self.econest_energy, sensor_name, identifiers)
                 self.sensors[sensor_name] = new_sensor
                 self.async_add_entities([new_sensor])
             self.sensors[sensor_name].update_state(value)
@@ -207,28 +211,37 @@ class EconestSensor(Entity):
 
     _attr_unit_of_measurement = UnitOfPower.WATT
 
-    def __init__(self, econest_energy, sensor_name):
+    def __init__(self, econest_energy, sensor_name, identifiers):
         """Initialize the sensor."""
-        self._sensor_name = sensor_name
+        self._attr_name = sensor_name
         self._state = None
+        self.identifiers = identifiers
         self._econest_energy = econest_energy
+        self._attr_unique_id = f"sensor.econest.{self._econest_energy.serial_number}-{self.identifiers}-{self._attr_name}"
+        self._attr_entity_id = f"sensor.{self._econest_energy.serial_number}_{self.identifiers.replace(' ', '_').replace('-', '_').lower()}_{self._attr_name.replace(' ', '_').replace('-', '_').lower()}"
 
     @property
     def device_info(self):
-        return {"identifiers": {(DOMAIN, self._econest_energy.serial_number_name)},
-                "name": self._econest_energy.serial_number_name,
+        return DeviceInfo({
+                "identifiers": {(DOMAIN, f"{self._econest_energy.serial_number}-{self.identifiers}")},
+                "name": self.identifiers,
                 "manufacturer": "Econest",
-                "model": "Econest"}
+                "model": "Econest"})
 
     @property
     def unique_id(self):
         """Return unique identifier"""
-        return f"{self._econest_energy.serial_number_name}_{self._sensor_name}"
+        return self._attr_unique_id
+
+    @property
+    def entity_id(self):
+        """Return the entity ID"""
+        return self._attr_entity_id
 
     @property
     def name(self):
         """Return the name of the sensor"""
-        return self._sensor_name
+        return self._attr_name
 
     @property
     def state(self):
